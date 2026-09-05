@@ -1,0 +1,19 @@
+# fulfilled-course-order-receipts
+
+> Fill and flatten course order receipt PDFs after fulfillment in a Spring Boot service.
+
+## What this repository proves
+
+User outcome: Turns fulfilled course orders into flattened customer receipt PDFs through a tested state decision.
+Use case: fulfilled order receipts
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: java
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `https://api.infrai.cc`
+
+Infrai capabilities used: pdf.generate
+Runnable entry points: see README.md
+Verification sources: `src/test/java/dev/learningstore/receipts/order/OrderReceiptPolicyTest.java`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt

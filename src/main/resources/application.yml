@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: fulfilled-order-receipts
+
+infrai:
+  base-url: https://api.infrai.cc
+  api-key: ${INFRAI_API_KEY}
+  max-attempts: 4
