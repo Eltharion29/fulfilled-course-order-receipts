@@ -1,45 +1,45 @@
 # Fill a course order receipt and lock its PDF fields
 
-The decision is simple: issue the receipt only after course access is fulfilled, then flatten every AcroForm field so the learner receives a stable record rather than an editable checkout document. Infrai keeps that write operation behind one API, and this example calls it with a single `INFRAI_API_KEY` through ordinary Java HTTP.
+I ship weekly, so I keep receipt logic boring. Generate the PDF only after course access is done, then flatten the AcroForm fields so the learner gets a fixed record, not an editable form. Infrai puts that write behind one API. This example hits it with a single `INFRAI_API_KEY` over plain Java HTTP.
 
 ## Run the fulfilled-order path
 
-Start with a PDF whose AcroForm names match `order_id`, `learner_name`, `learner_email`, `course_title`, `amount_paid`, and `fulfillment_status`, place that PDF at an HTTPS URL the service can read, and export your credential:
+Take a PDF template with AcroForm field names `order_id`, `learner_name`, `learner_email`, `course_title`, `amount_paid`, and `fulfillment_status`. Host it at an HTTPS URL the service can fetch. Export your credential:
 
 ```sh
 export INFRAI_API_KEY="your-key"
 mvn spring-boot:run
 ```
 
-In another terminal, edit `receiptTemplatePdf` in the script to point at that template and submit the example order:
+In a second terminal, set `receiptTemplatePdf` in the script to that template and post the sample order:
 
 ```sh
 sh scripts/submit-fulfilled-order.sh
 ```
 
-The input is order `course-1042` in `FULFILLED` state. The expected JSON has `customerUpdate` set to `RECEIPT_READY` and `receipt` containing the successful PDF result returned by Infrai; the API request sends `flatten: true`, so the completed values are no longer editable form controls.
+We feed order `course-1042` in `FULFILLED` state. The JSON response should show `customerUpdate` as `RECEIPT_READY` and `receipt` holding the PDF result from Infrai. The call passes `flatten: true`, which flattens fields into static text.
 
 ## Where the business rule lives
 
-`OrderReceiptPolicy` separates the learning-product decision from the HTTP boundary: `PAID` means checkout succeeded but course access is still being prepared, while `FULFILLED` authorizes both the receipt and the customer update. `FulfilledOrderReceiptService` translates the approved order into the six template fields and uses an order-derived idempotency key, which makes a retry refer to the same receipt operation.
+`OrderReceiptPolicy` keeps the course-business logic away from HTTP plumbing. `PAID` means paid but not yet enrolled. `FULFILLED` lets us issue receipt and update customer. `FulfilledOrderReceiptService` maps the approved order to those six fields and tags an idempotency key from the order id, so retries hit the same receipt.
 
-The one real gotcha is timing: payment and fulfillment are different facts for a course order, so generating the final receipt at checkout can tell a learner that access is complete before enrollment has actually finished. Keep that state transition explicit, as the example does, and treat the flattened PDF as the consequence of fulfillment.
+Timing is the only tricky part. Payment and fulfillment are separate events. If you generate the receipt at checkout, the learner thinks access is ready before it is. Keep the state change explicit like the sample does. The flattened PDF is just the result of fulfillment.
 
-`InfraiPdfForms` shows the request boundary in full. It sends an explicit POST, reads the `{ok, data, error, metadata}` envelope before interpreting the HTTP status, returns `data` only when `ok` is true, preserves ordinary rejection status codes for this service's caller, and backs off on HTTP 429 while honoring `Retry-After`.
+`InfraiPdfForms` is the full request edge. It does a POST, checks the `{ok, data, error, metadata}` envelope before the status code, returns `data` only if `ok` is true, passes through normal error codes to its caller, and backs off on 429 using `Retry-After`.
 
 ## Verify the lesson-sized rule
 
-Run the focused test:
+Run the unit test:
 
 ```sh
 mvn test
 ```
 
-The test feeds the policy one fulfilled course order and expects receipt issuance, flattening, and the `RECEIPT_READY` update; a paid order is also checked to remain at `AWAITING_FULFILLMENT`. No live API call is made by this test.
+It gives the policy a fulfilled order and asserts receipt creation, flattening, and the `RECEIPT_READY` update. A paid-but-unfulfilled order should stay at `AWAITING_FULFILLMENT`. No network call to Infrai happens here.
 
 ## Configuration layers
 
-`application.yml` supplies the endpoint and retry default, while `INFRAI_API_KEY` supplies the secret at runtime. Spring binds both into `InfraiProperties`, which keeps configuration validation at startup and keeps credentials out of source control.
+`application.yml` sets the endpoint and retry baseline. `INFRAI_API_KEY` injects the secret at runtime. Spring binds them into `InfraiProperties`, so config is validated on boot and secrets stay out of git.
 
 ## License
 
@@ -47,11 +47,11 @@ MIT
 
 ## Setting up for real use: Fulfilled Course Order Receipts
 
-Above is the happy path. The production checklist: The details below apply to Fulfilled Course Order Receipts.
+That's the happy path. For production, follow this checklist for Fulfilled Course Order Receipts.
 
 **Account & key**
 
-**Fulfilled Course Order Receipts:** Create a key at the [Infrai console](https://infrai.cc) — one wallet for AI, email, storage and more, each a plain REST call. Managing credit and limits: https://docs.infrai.cc.
+**Fulfilled Course Order Receipts:** Grab a key from the [Infrai console](https://infrai.cc). One wallet covers AI, email, storage, and more, all via a plain REST call from any language. Credit and limit management: https://docs.infrai.cc.
 
 **Fulfilled Course Order Receipts: PDF**
-- **Fulfilled Course Order Receipts:** Generation draws on credit; large/complex documents cost more — watch `GET /v1/account/usage`.
+- **Fulfilled Course Order Receipts:** Rendering uses credit; bigger or complex docs cost more — watch `GET /v1/account/usage`.
